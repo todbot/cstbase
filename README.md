@@ -1,4 +1,6 @@
-cst-base
+cstbase
 ========
 
-cst-base
+CST Base Station firmware and host library.
+
+
