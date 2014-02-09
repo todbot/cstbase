@@ -16,3 +16,14 @@
 *.exe
 *.out
 *.app
+
+
+# Others
+# Mac crap
+.DS_Store
+# emacs backups
+*~
+# java build results
+*.class
+# c build results
+*.o
