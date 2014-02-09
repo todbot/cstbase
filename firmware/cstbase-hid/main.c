@@ -81,13 +81,13 @@
 #pragma config STVREN   = ON
 #pragma config BORV     = LO
 #pragma config LPBOR    = OFF
-#pragma config LVP      = ON  // keep that on when using LVP programmer
+#pragma config LVP      = OFF  // keep that on when using LVP programmer
 
 // -------------------------------------------------------------------
 
 
-#define cstbase_ver_major  '1'
-#define cstbase_ver_minor  '0'
+#define cstbase_ver_major  '3'
+#define cstbase_ver_minor  '8'
 
 #define cstbase_report_id 0x01
 
@@ -180,8 +180,9 @@ inline void loadSerialNumber(void)
 //    - Send byte to watch      format: { 1, 'S', b, ...
 //    - Receive byte from watch format: { 1, 'R', ...
 //    - 
-//    - Set Base LED            format: { 1, 'L',  
-//    - Get Base Version        format: { 1, 'V', 0,0,0
+//    - Set Base LED            format: { 1, 'l', ...
+//    - Get Base Button State   format: { 1, 'b', ...
+//    - Get Base Version        format: { 1, 'v', 0,0,0
 //
 //
 // Available commands:
@@ -277,6 +278,11 @@ void handleMessage(const char* msgbuf)
     //
     else if( cmd == 'D' ) {
     }
+    // Base Station button state  format: { 1, 'b' 0,0,0, 0,0,0 }
+    // 
+    else if( cmd == 'b' ) {
+        hid_send_buf[3] =  PORTA;  // just return all of PORTA because why not?
+    }
     //  Get version               format: { 1, 'v', 0,0,0,        0,0, 0 }
     //
     else if( cmd == 'v' ) {
@@ -339,6 +345,8 @@ static void InitializeSystem(void)
     TRISA = 0x00;
     TRISC = 0x00;
 
+    TRISCbits.TRISC3 = 1; //disable  // FIXME: look into why he's doing this
+
     // setup oscillator
     OSCTUNE = 0;
     OSCCON = 0xFC;          //16MHz HFINTOSC with 3x PLL enabled (48MHz operation)
@@ -354,6 +362,11 @@ static void InitializeSystem(void)
 
     loadSerialNumber();
 
+    OPTION_REGbits.nWPUEN=0; // clear this bit to enable weak pull ups
+
+    TRISCbits.TRISC3 = 0; //enable  // FIXME: look into why he's doing this
+
+    mInitAllSwitches();
     mInitAllLEDs();
 
     for( int i=0; i<10; i++ ) { 

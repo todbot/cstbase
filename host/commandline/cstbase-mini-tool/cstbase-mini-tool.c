@@ -41,6 +41,7 @@ char *cstbase_error_msg(int errCode);
 void cstbase_close(usbDevice_t *dev);
 int cstbase_setRGB(usbDevice_t *dev, uint8_t r, uint8_t g, uint8_t b );
 int cstbase_getVersion(usbDevice_t* dev);
+int cstbase_getButtons(usbDevice_t* dev);
 void cstbase_sleep(uint16_t millis);
 
 static int  hexread(char *buffer, char *string, int buflen);
@@ -50,6 +51,7 @@ static void usage(char *myName)
 {
     fprintf(stderr, "usage:\n");
     fprintf(stderr, "  %s blink [<num>] \n", myName);
+    fprintf(stderr, "  %s buttons \n", myName);
     fprintf(stderr, "  %s version \n", myName);
     fprintf(stderr, "  %s rgb <red>,<green>,<blue> \n", myName);
     //fprintf(stderr, "  %s read\n", myName);
@@ -78,6 +80,13 @@ int main(int argc, char **argv)
     if( strcasecmp(cmd, "version") == 0 ) { 
         rc = cstbase_getVersion(dev);
         printf("verison: %d\n", rc);
+    }
+    else if( strcasecmp(cmd, "buttons") == 0 ) { 
+        rc = cstbase_getButtons(dev);
+        printf("verison: %x\n", rc);
+    }
+    else if( strcasecmp(cmd, "rgb") == 0 ) { 
+        rc = cstbase_setRGB(dev, 0,0,0 );
     }
     else if( strcasecmp(cmd, "blink") == 0 ) {
         if( argc < 3 ) { 
@@ -175,6 +184,26 @@ int cstbase_getVersion(usbDevice_t *dev)
     // rc is now version number or error  
     // FIXME: we don't know vals of errcodes
     return rc;
+}
+
+//
+int cstbase_getButtons(usbDevice_t *dev)
+{
+    char buf[cstbase_buf_size] = {cstbase_report_id, 'b' };
+    int len = sizeof(buf);
+    int rc;
+
+    if( (rc = usbhidSetReport(dev, buf, len)) != 0) {
+        fprintf(stderr,"getButtons: error writing: %s\n",cstbase_error_msg(rc));
+        return rc;
+    }
+    //cstbase_sleep( 50 ); //FIXME:
+
+    if((rc = usbhidGetReport(dev, 1, (char*)buf, &len)) != 0) {
+        fprintf(stderr, "getButtons: error reading data: %s\n", cstbase_error_msg(rc));
+        return rc;
+    }        
+    return buf[3] >> 3;  // shift them down to bit pos 0,1,2
 }
 
 /**

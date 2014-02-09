@@ -135,11 +135,6 @@
     #define mLED_3              LATCbits.LATC2
     #define mLED_4              LATCbits.LATC3
 
-    //#define mLED_1              LATCbits.LATC2
-    //#define mLED_2              LATCbits.LATC3
-    //#define mLED_3              LATCbits.LATC0
-    //#define mLED_4              LATCbits.LATC1
-    
     #define mGetLED_1()         mLED_1
     #define mGetLED_2()         mLED_2
     #define mGetLED_3()         mLED_3
@@ -161,17 +156,16 @@
     #define mLED_4_Toggle()     mLED_4 = !mLED_4;
     
     /** SWITCH *********************************************************/
-    #define mInitSwitch2()      //TRISAbits.TRISA3=1
-        //only one switch available so double duty
-    #define mInitSwitch3()      //TRISAbits.TRISA3=1
-    #define sw2                 PORTAbits.RA3
-    #define sw3                 PORTAbits.RA3
-    #define mInitAllSwitches()  mInitSwitch2();
+    #define swMinus             PORTAbits.RA3
+    #define swSet               PORTAbits.RA4
+    #define swPlus              PORTAbits.RA5
 
+    // Set RA<5:3> as inputs
+    // Weak pull ups on buttons
+    #define mInitAllSwitches()   \
+       TRISA = 0b00111000; \
+       WPUA = 0b00111000;     
 
-    /** POT ************************************************************/
-    //#define mInitPOT()          {TRISBbits.TRISB4=1;ADCON0=0x29;ADCON1=0xE0;ADCON2=0x00;}
-    #define mInitPOT()          { }
 
     /** I/O pin definitions ********************************************/
     #define INPUT_PIN 1

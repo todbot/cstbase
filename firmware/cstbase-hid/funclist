@@ -1,6 +1,6 @@
 _UserGetReportHandler: CODE, 3967 0 10
 _serialnum_packed: CODE, 8184 0 4
-_handleMessage: CODE, 754 0 92
+_handleMessage: CODE, 754 0 101
 _configDescriptor1: STRCODE, 4153 0 41
 _USB_CD_Ptr: STRCODE, 4103 0 2
 _UserSetReportHandler: CODE, 3977 0 15
@@ -25,21 +25,21 @@ _USBCtrlTrfSetupHandler: CODE, 2351 0 43
 _USBCtrlTrfOutHandler: CODE, 4065 0 31
 _USBCtrlEPServiceComplete: CODE, 2817 0 86
 _USBSuspend: CODE, 3570 0 14
-_memcpy: CODE, 846 0 25
-_tohex: CODE, 218 0 13
+_memcpy: CODE, 855 0 25
+_tohex: CODE, 225 0 13
 __initialization: CODE, 28 0 22
 _USBStdSetCfgHandler: CODE, 2454 0 80
 _USBStdGetStatusHandler: CODE, 2670 0 62
 _USBCBInitEP: CODE, 3993 0 4
 _USBWakeFromSuspend: CODE, 3555 0 15
 _device_dsc: STRCODE, 4252 0 18
-_InitializeSystem: CODE, 82 0 136
+_InitializeSystem: CODE, 82 0 143
 _USBCtrlTrfRxService: CODE, 3055 0 118
 _USBCtrlTrfTxService: CODE, 2968 0 87
 _USBEnableEndpoint: CODE, 3997 0 31
 _USBConfigureEndpoint: CODE, 4028 0 37
 _USBHIDCBSetReportComplete: CODE, 752 0 2
-_USBDeviceInit: CODE, 231 0 112
+_USBDeviceInit: CODE, 238 0 112
 _USB_SD_Ptr: STRCODE, 4097 0 6
 _USBCB_SOF_Handler: CODE, 3859 0 1
 _USBCBSuspend: CODE, 3857 0 1
@@ -53,4 +53,4 @@ _USBDeviceTasks: CODE, 3373 0 148
 _USBCheckHIDRequest: CODE, 3862 0 105
 _USBCheckStdRequest: CODE, 2394 0 60
 _loadSerialNumber: CODE, 0 0 0
-Total: 2386
+Total: 2402
