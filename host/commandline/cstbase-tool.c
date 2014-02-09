@@ -116,24 +116,20 @@ static void usage(char *myName)
 "  --play <1/0,start,end,cnt>  Playing color sequence sub-loop (mk2)\n"
 "  --servertickle <1/0>[,1/0]  Turn on/off servertickle (w/on/off, uses -t msec)\n"
 "  --running                   Multi-LED effect (uses --led & --rgb)\n"
-"  --list                      List connected blink(1) devices \n"
+"  --list                      List connected CST Base devices \n"
 " Nerd functions: (not used normally) \n"
 "  --version                   Display cstbase-tool version info \n"
 "and [options] are: \n"
 "  -d dNums --id all|deviceIds Use these cstbase ids (from --list) \n"
 "  -q, --quiet                 Mutes all stdout output (supercedes --verbose)\n"
 "  -t ms,   --delay=millis     Set millisecs between events (default 500)\n"
-"  -l <led>, --led=<led>       Set which RGB LED in a blink(1) mk2 to use\n"
 "  -v, --verbose               verbose debugging msgs\n"
 "\n"
 "Examples \n"
 "  cstbase-tool -m 100 --rgb=255,0,255    # fade to #FF00FF in 0.1 seconds \n"
 "  cstbase-tool -t 2000 --random=100      # every 2 seconds new random color\n"
-"  cstbase-tool --rgb=0xff,0,00 --blink 3 # blink red 3 times\n"
 "\n"
             ,myName);
-//"  --hidread                   Read a blink(1) USB HID GetFeature report \n"
-//"  --hidwrite <listofbytes>    Write a blink(1) USB HID SetFeature report \n"
 }
 
 // local states for the "cmd" option variable
@@ -259,7 +255,7 @@ int main(int argc, char** argv)
 
 
     if( count == 0 ) {
-        msg("no blink(1) devices found\n");
+        msg("no CST Base devices found\n");
         exit(1);
     }
 
@@ -280,7 +276,7 @@ int main(int argc, char** argv)
     dev = cstbase_openById( deviceIds[0] );
 
     if( dev == NULL ) { 
-        msg("cannot open blink(1), bad id or serial number\n");
+        msg("cannot open CST Base, bad id or serial number\n");
         exit(1);
     }
 
@@ -288,7 +284,7 @@ int main(int argc, char** argv)
     // begin command processing
 
     if( cmd == CMD_LIST ) { 
-        printf("blink(1) list: \n");
+        printf("CST Base list: \n");
         for( int i=0; i< count; i++ ) {
             printf("id:%d - serialnum:%s %s\n", i, cstbase_getCachedSerial(i), 
                    (cstbase_isMk2ById(i)) ? "(mk2)":"");

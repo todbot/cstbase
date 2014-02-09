@@ -1,7 +1,7 @@
 /*
- * blink(1) C library -- 
+ * cstbased C library -- Library for controlling CST Base Station
  *
- * 2012, Tod E. Kurt, http://todbot.com/blog/ , http://thingm.com/
+ * 2014, Tod E. Kurt, http://todbot.com/blog/ , http://thingm.com/
  *
  */
 
@@ -45,8 +45,8 @@ typedef struct usbDevice   cstbase_device; /**< opaque cstbase structure */
 #endif
 
 
-int cstbase_vid(void);  // return VID for blink(1)
-int cstbase_pid(void);  // return PID for blink(1)
+int cstbase_vid(void);  // return VID for CST Base Station
+int cstbase_pid(void);  // return PID for CST Base Station
 
 
 const char*  cstbase_getCachedPath(int i);
@@ -62,18 +62,18 @@ int          cstbase_getCachedCount(void);
 int          cstbase_isMk2ById(int i);
 int          cstbase_isMk2(cstbase_device* dev);
 
-// scan USB for blink(1) devices
+// scan USB for CST Base devices
 int          cstbase_enumerate();
 // scan USB for devices by given VID,PID
 int          cstbase_enumerateByVidPid(int vid, int pid);
 
-// open first found blink(1) device
+// open first found CST Base device
 cstbase_device* cstbase_open(void);
 
-// open blink(1) by USB path  note: this is platform-specific, and port-specific
+// open CST Base by USB path  note: this is platform-specific, and port-specific
 cstbase_device* cstbase_openByPath(const char* path);
 
-// open blink(1) by 8-digit serial number
+// open CST Base by 8-digit serial number
 cstbase_device* cstbase_openBySerial(const char* serial);
 
 // open by "id", which if from 0-cstbase_max_devices is index

@@ -1,12 +1,12 @@
-Command-line Tool and C library for blink(1)
-============================================
+Command-line Tool and C library for cstbase
+===========================================
 
 To build, see the Makefile.
 
 The current support build products are:
 
-- `blink1-tool` -- command-line tool for controlling blink(1)
-- `blink1-lib` -- C library for controlling blink(1)
+- `cstbase-tool` -- command-line tool for controlling CST Base Station
+- `cstbase-lib` -- C library for controlling CST Base Station
 
 
 Supported platforms:
@@ -20,7 +20,7 @@ Supported platforms:
 - OpenWRT / DD-WRT
 - ... just about anything else with Gnu Make & a C-compiler
 
-In general, the `blink1-tool` builds as a static binary where possible,
+In general, the `cstbase-tool` builds as a static binary where possible,
 eliminating the need for shared library dependencies on the target.
 
 

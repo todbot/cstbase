@@ -42,12 +42,6 @@ static int cstbase_enable_degamma = 1;
 #define LOG(...) do {} while (0)
 #endif
 
-// addresses in EEPROM for mk1 blink(1) devices
-#define cstbase_eeaddr_osccal        0
-#define cstbase_eeaddr_bootmode      1
-#define cstbase_eeaddr_serialnum     2
-#define cstbase_serialnum_len        4
-#define cstbase_eeaddr_patternstart (cstbase_eeaddr_serialnum + cstbase_serialnum_len)
 
 void cstbase_sortCache(void);
 

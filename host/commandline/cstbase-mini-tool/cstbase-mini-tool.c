@@ -1,5 +1,5 @@
 /* 
- * cstbase-mini-tool -- minimal command-line tool for controlling blink(1)s
+ * cstbase-mini-tool -- minimal command-line tool for controlling CST Base Stations
  *                     
  * Will work on small unix-based systems that have just libusb-0.1.4
  * No need for pthread & iconv, which is needed for hidapi-based tools
@@ -132,7 +132,7 @@ int main(int argc, char **argv)
 
 
 /**
- * Open up a blink(1) for transactions.
+ * Open up a CST Base for transactions.
  * returns 0 on success, and opened device in "dev"
  * or returns non-zero error that can be decoded with cstbase_error_msg()
  * FIXME: what happens when multiple are plugged in?
