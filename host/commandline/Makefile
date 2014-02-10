@@ -283,7 +283,6 @@ help:
 	@echo "make OS=wrt     ... build OpenWrt cstbase-lib and cstbase-tool"
 	@echo "make USBLIB_TYPE=HIDDATA OS=linux ... build using low-dep method"
 	@echo "make lib        ... build cstbase-lib shared library"
-	@echo "make cstbase-tiny-server ... build tiny REST server"
 	@echo "make package PKGOS=mac  ... zip up build, give it a name 'mac' "
 	@echo "make clean ..... to delete objects and hex file"
 	@echo
@@ -295,11 +294,6 @@ cstbase-tool: $(OBJS) cstbase-tool.o
 	$(CC) $(CFLAGS) -c cstbase-tool.c -o cstbase-tool.o
 	$(CC) $(CFLAGS) $(EXEFLAGS) -g $(OBJS) $(LIBS) cstbase-tool.o -o cstbase-tool$(EXE) 
 
-# FIXME: verify we don't need MONGOOSE_LIBS and pthread & dl are avilable everywhere
-cstbase-tiny-server: $(OBJS) server/cstbase-tiny-server.c
-	$(CC) $(CFLAGS) -I. -I./server/mongoose -c server/cstbase-tiny-server.c -o cstbase-tiny-server.o
-	$(CC) $(CFLAGS) -I. -I./server/mongoose -c ./server/mongoose/mongoose.c -o ./server/mongoose/mongoose.o
-	$(CC) -g $(OBJS) $(EXEFLAGS) ./server/mongoose/mongoose.o $(LIBS) -lpthread -ldl cstbase-tiny-server.o -o cstbase-tiny-server$(EXE)
 
 lib: $(OBJS)
 	$(CC) $(LIBFLAGS) $(CFLAGS) $(OBJS) $(LIBS)
@@ -313,12 +307,10 @@ package:
 clean: 
 	rm -f $(OBJS)
 	rm -f $(LIBTARGET)
-	rm -f cstbase-tiny-server.o cstbase-tool.o hiddata.o
-	rm -f server/mongoose/mongoose.o
+	rm -f cstbase-tool.o hiddata.o
 
 distclean: clean
 	rm -f cstbase-tool$(EXE)
-	rm -f cstbase-tiny-server$(EXE)
 	rm -f $(LIBTARGET) $(LIBTARGET).a
 
 # show shared library use

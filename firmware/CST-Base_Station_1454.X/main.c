@@ -117,8 +117,10 @@ void main(void) {
     //Set up UART                               2048 baud is what the watch can do with the clock crystal timer only.
     BRGH=0;					//No Divider
     BRG16=1;                                    //16 bit mode
-    SPBRGL=184;                              //  2048 @ 48MHz, SPBRG = (48MHz/(16*BAUD_RATE))-1 = 1463.8;
-    SPBRGH=5;                                   //256 * 5 + 184 = 1464
+    //    SPBRGL=184;                              //  2048 @ 48MHz, SPBRG = (48MHz/(16*BAUD_RATE))-1 = 1463.8;
+    //SPBRGH=5;                                   //256 * 5 + 184 = 1464
+    SPBRGL=225;                                //  2400 @ 48MHz, SPBRG = (48MHz/(16*BAUD_RATE))-1 = 1249;
+    SPBRGH=4;                                 //256 * 4 + 225 = 1249
 
     //Set Up Transmitter
     TXEN=1;

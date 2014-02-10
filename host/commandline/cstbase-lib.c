@@ -33,7 +33,6 @@ typedef struct cstbase_info_ {
 static cstbase_info cstbase_infos[cache_max];
 static int cstbase_cached_count = 0;  // number of cached entities
 
-static int cstbase_enable_degamma = 1;
 
 // set in Makefile to debug HIDAPI stuff
 #ifdef DEBUG_PRINTF
@@ -119,16 +118,6 @@ int cstbase_clearCacheDev( cstbase_device* dev )
     return i;
 }
 
-int cstbase_isMk2ById( int i )
-{
-    if( i>=0  && cstbase_infos[i].type == CSTBASE_MK2 ) return 1;
-    return 0;
-}
-
-int cstbase_isMk2( cstbase_device* dev )
-{
-    return cstbase_isMk2ById( cstbase_getCacheIndexByDev(dev) );
-}
 
 
 //
@@ -146,6 +135,58 @@ int cstbase_getVersion(cstbase_device *dev)
         rc = ((buf[3]-'0') * 100) + (buf[4]-'0'); 
     // rc is now version number or error  
     // FIXME: we don't know vals of errcodes
+    return rc;
+}
+
+//
+int cstbase_getButtons(cstbase_device *dev)
+{
+    char buf[cstbase_buf_size] = {cstbase_report_id, 'b' };
+    int len = sizeof(buf);
+
+    int rc = cstbase_write(dev, buf, sizeof(buf));
+    cstbase_sleep( 50 ); //FIXME:
+    if( rc != -1 ) // no error
+        rc = cstbase_read(dev, buf, len);
+    if( rc != -1 ) // also no error
+        rc = buf[3] >> 3; // shift them down to bit pos 0,1,2
+    // rc is now button state as bitfield
+    return rc;
+}
+
+//
+int cstbase_sendBytesToWatch(cstbase_device *dev, uint8_t* bytebuf, uint8_t len )
+{
+    uint8_t buf[cstbase_buf_size];
+
+    if( len > 6 ) { // error
+        LOG("cstbase_sendBytesToWatch: oops, len > 6\n");
+        return -1;
+    }
+
+    buf[0] = cstbase_report_id;     // report id
+    buf[1] = 'S';   // command code for "set rgb now"
+    buf[2] = len;
+    for( int i=0; i< len; i++ ) {
+        buf[3+i] = bytebuf[i];
+    }
+    
+    int rc = cstbase_write(dev, buf, sizeof(buf) );
+    
+    return rc; 
+}
+
+//
+int cstbase_getByteFromWatch(cstbase_device *dev)
+{
+    char buf[cstbase_buf_size] = {cstbase_report_id, 'R' };
+    int len = sizeof(buf);
+
+    int rc = cstbase_write(dev, buf, sizeof(buf));
+    //cstbase_sleep( 50 ); //FIXME:
+    if( rc != -1 ) // no error
+        rc = cstbase_read(dev, buf, len);
+    // rc is now last received byte, or error -1
     return rc;
 }
 
@@ -173,56 +214,6 @@ int cstbase_testtest( cstbase_device *dev)
 
 
 
-/* ------------------------------------------------------------------------- */
-
-void cstbase_enableDegamma()
-{
-    cstbase_enable_degamma = 1;
-}
-void cstbase_disableDegamma()
-{
-    cstbase_enable_degamma = 0;
-}
-
-// a simple logarithmic -> linear mapping as a sort of gamma correction
-// maps from 0-255 to 0-255
-static int cstbase_degamma_log2lin( int n )  
-{
-  //return  (int)(1.0* (n * 0.707 ));  // 1/sqrt(2)
-    return (((1<<(n/32))-1) + ((1<<(n/32))*((n%32)+1)+15)/32);
-}
-// from http://rgb-123.com/ws2812-color-output/
-//   GammaE=255*(res/255).^(1/.45)
-//
-uint8_t GammaE[] = { 
-0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2,
-2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5,
-6, 6, 6, 7, 7, 7, 8, 8, 8, 9, 9, 9, 10, 10, 11, 11,
-11, 12, 12, 13, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18,
-19, 19, 20, 21, 21, 22, 22, 23, 23, 24, 25, 25, 26, 27, 27, 28,
-29, 29, 30, 31, 31, 32, 33, 34, 34, 35, 36, 37, 37, 38, 39, 40,
-40, 41, 42, 43, 44, 45, 46, 46, 47, 48, 49, 50, 51, 52, 53, 54,
-55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70,
-71, 72, 73, 74, 76, 77, 78, 79, 80, 81, 83, 84, 85, 86, 88, 89,
-90, 91, 93, 94, 95, 96, 98, 99,100,102,103,104,106,107,109,110,
-111,113,114,116,117,119,120,121,123,124,126,128,129,131,132,134,
-135,137,138,140,142,143,145,146,148,150,151,153,155,157,158,160,
-162,163,165,167,169,170,172,174,176,178,179,181,183,185,187,189,
-191,193,194,196,198,200,202,204,206,208,210,212,214,216,218,220,
-222,224,227,229,231,233,235,237,239,241,244,246,248,250,252,255};
-//
-static int cstbase_degamma_better( int n ) 
-{
-    return GammaE[n];
-}
-
-//
-int cstbase_degamma( int n ) 
-{ 
-    //return cstbase_degamma_log2lin(n);
-    return cstbase_degamma_better(n);
-}
 
 // qsort char* string comparison function 
 int cmp_cstbase_info_serial(const void *a, const void *b) 
@@ -249,15 +240,11 @@ void cstbase_sortCache(void)
 //
 int cstbase_vid(void)
 {
-    //uint8_t  rawVid[2] = {USB_CFG_VENDOR_ID};
-    //int vid = rawVid[0] + 256 * rawVid[1];
     return CSTBASE_VENDOR_ID;
 }
 //
 int cstbase_pid(void)
 {
-    //uint8_t  rawPid[2] = {USB_CFG_DEVICE_ID};
-    //int pid = rawPid[0] + 256 * rawPid[1];
     return CSTBASE_DEVICE_ID;
 }
 

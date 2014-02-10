@@ -1,4 +1,3 @@
-
 /********************************************************************
  * CST Base station firmware
  *
@@ -8,32 +7,34 @@
  * - http://www.microchip.com/stellent/idcplg?IdcService=SS_GET_PAGE&nodeId=2680&dDocName=en547784
  *
  * Note: to compile, must have the Microchip Application Library frameworks
- * symlinked in the same directory level as the "blink1mk2" directory.
+ * symlinked in the same directory level as the "cstbase-hid" directory.
  * e.g. if you installed the framework in ~/microchip_solutions_v2013-06-15/Microchip
- * then do: ln -s ~/microchip_solutions_v2013-06-15/Microchip Microchip
+ * then do: "ln -s ~/microchip_solutions_v2013-06-15/Microchip Microchip"
  *
  *
  * A modified version of "usb_device.c" from MCHPFSUSB is needed for 
  * RAM-based serial numbers and is provided.
  *
  * PIC16F1454 pins used:
- * MLF/QFN                                                            DIP pkg
- * pin 1  - RA5            - input : "+" button                       2
- * pin 2  - RA4            - input : "12/24 hr" button                3
- * pin 3  - RA3/MCLR/VPP   - input : "-" button                       4 
- * pin 4  - RC5            - output: UART TX, to watch                5
- * pin 5  - RC4            - input : UART RX, to watch                6
- * pin 6  - RC3            - output: LED                              7
- * pin 7  - RC2            - output: 12V or 5V , to watch             8
- * pin 8  - RC1            - n/c                                      -
- * pin 9  - RC0            - n/c                                      -
- * pin 10 - VUSB3V3        - 100nF cap to Gnd                        11
- * pin 11 - RA1/D-/ICSPC   - D-  on USB                              12
- * pin 12 - RA0/D+/ICSPD   - D+  on USB                              13
- * pin 13 - VSS            - Gnd on USB                              14
- * pin 14 - n/c            - n/c                                      -
- * pin 15 - n/c            - n/c                                      -
- * pin 16 - VDD            - +5V on USB, 10uF & 100nF cap to Gnd      1
+ *
+ * QFN pkg                                                            DIP pkg
+ * -------                                                            -------
+ * pin 1  - RA5            - input : "+" button              - RA5 -  pin 2
+ * pin 2  - RA4            - input : "12/24 hr" button       - RA4 -  pin 3
+ * pin 3  - RA3/MCLR/VPP   - input : "-" button              - RA3 -  pin 4 
+ * pin 4  - RC5            - input : UART RX, to watch       - RC5 -  pin 5
+ * pin 5  - RC4            - output: UART TX, to watch       - RC4 -  pin 6
+ * pin 6  - RC3            - output: LED                     - RC3 -  pin 7
+ * pin 7  - RC2            - output: 12V or 5V , to watch    - RC2 -  pin 8
+ * pin 8  - RC1/ICSPCLK    - n/c                             - RC1 -  pin 9
+ * pin 9  - RC0/ICSPDAT    - n/c                             - RC0 -  pin 10
+ * pin 10 - VUSB3V3        - 100nF cap to Gnd                -VUSB -  pin 11
+ * pin 11 - RA1/D-/ICSPC   - D-  on USB                      - RA1 -  pin 12
+ * pin 12 - RA0/D+/ICSPD   - D+  on USB                      - RA0 -  pin 13
+ * pin 13 - VSS            - Gnd on USB                      - VSS -  pin 14
+ * pin 14 - n/c            - n/c                             -     -  -
+ * pin 15 - n/c            - n/c                             -     -  -
+ * pin 16 - VDD            - +5V on USB                      - VDD -  pin 1
  *
  *
  * 2014, Tod E. Kurt, http://thingm.com/
@@ -49,6 +50,10 @@
 #include "./USB/usb_function_hid.h"
 
 #include <stdint.h>
+
+
+//#define UART_BAUD_RATE 2400
+#include "uart_funcs.h"
 
 
 #if 1 // to fix stupid IDE error issues with __delay_ms
@@ -102,17 +107,15 @@ const uint8_t serialnum_packed[4] @ 0x1FF8 = {0x21, 0x43, 0xba, 0xdc };
 RAMSNt my_RAMSN;
 #endif
 
-#if defined(__XC8)
 #if defined(_16F1459) || defined(_16F1455) || defined(_16F1454)
 #define RX_DATA_BUFFER_ADDRESS @0x2050
 #define TX_DATA_BUFFER_ADDRESS @0x20A0
-// FIXME: this is ugly
+// FIXME: the below is ugly & redundant
 #define IN_DATA_BUFFER_ADDRESS 0x2050
 #define OUT_DATA_BUFFER_ADDRESS (IN_DATA_BUFFER_ADDRESS + HID_INT_IN_EP_SIZE)
 #define FEATURE_DATA_BUFFER_ADDRESS (OUT_DATA_BUFFER_ADDRESS + HID_INT_OUT_EP_SIZE)
 #define FEATURE_DATA_BUFFER_ADDRESS_TAG @FEATURE_DATA_BUFFER_ADDRESS
 //
-#endif
 #else
 #define RX_DATA_BUFFER_ADDRESS
 #define TX_DATA_BUFFER_ADDRESS
@@ -123,19 +126,375 @@ uint8_t hid_send_buf[USB_EP0_BUFF_SIZE] FEATURE_DATA_BUFFER_ADDRESS_TAG;
 uint8_t usbHasBeenSetup = 0;  // set in USBCBInitEP()
 #define usbIsSetup (USBGetDeviceState() == CONFIGURED_STATE)
 
+// original base station variables
+//bit plusButtonPressed = 0;
+//bit minusButtonPressed = 0;
+bit modeButtonPressed = 0;
+//bit allButtonsPressed = 0;
+bit LEDdirection = 0; //1=up, 0=down
+int timeOutCounter=0;
+int batteryCounter;
+bit batteryCharged=0;
+//unsigned char udata;
+bit timeToUpdateState=0;
+uint8_t lastRxByte=0;
+
 //
 static void InitializeSystem(void);
 void USBCBSendResume(void);
 void USBHIDCBSetReportComplete(void);
 
+static char tohex(uint8_t num);
+inline void loadSerialNumber(void);
+void updateState(void);
+void handleKeys(void);
+unsigned char countStepsRA3(void);
+unsigned char countStepsRA4(void);
+
 
 // ----------------------- millis time keeping -----------------------------
 
+// millis time created by Timer2 handling in interrupt
+
 volatile uint32_t tick;  // for "millis()" function, a count of 1.024msec units
 
-// also see Timer2 handling in interrupt
 // hack because this compiler has no optimizations
 #define millis() (tick)
+
+
+// ****************************************************************************
+// main
+//
+int main(void)
+{
+    InitializeSystem();
+
+    USBDeviceAttach();
+    
+    while (1) {
+        updateState();
+        handleKeys();
+        CLRWDT();  // tickle watchdog
+    }
+
+} //end main
+
+
+// ****************************************************************************
+//
+static void InitializeSystem(void)
+{
+    // setup oscillator
+    //OSCTUNE = 0;
+    //OSCCON = 0xFC;          //16MHz HFINTOSC with 3x PLL enabled (48MHz operation)
+    //ACTCON = 0x90;          //Enable active clock tuning with USB
+    // Set up clock for 48Mhz
+    OSCCONbits.SCS=0;
+    OSCCONbits.IRCF=15;
+    OSCCONbits.SPLLMULT = 1;
+
+    OPTION_REGbits.nWPUEN=0; // clear this bit to enable weak pull ups
+
+    //Configure LED
+    TRISCbits.TRISC3 = 1; //disable
+    PWM2EN=0;
+    PWM2OE=0;
+    PWM2OUT=0;
+    PWM2POL=0;
+    //
+    PR2=0xFF;
+    PWM2DCH=0x00;
+    PWM2DCL=0x00;
+    //
+    PWM2EN=1;
+    PWM2OE=1;
+    //
+    TMR2IF=0;
+    T2CKPS0=0;
+    T2CKPS1=0;
+    TMR2ON=1;
+    //
+    TRISCbits.TRISC3 = 0; //enable
+
+    //Interrupt Timer
+    // 
+    //  frequency=48mhz
+    // Time Period = 0.083uS
+    // Prescaller Period = .083 x 8 = 51.2uS
+    // Overflow Period   = 51.2 x 256 = 13107.2 uS
+    //                  = 0.04369067 sec
+    // Setup Timer0
+    OPTION_REGbits.PS0=1;
+    OPTION_REGbits.PS1=1;
+    OPTION_REGbits.PS1=1;
+
+    PSA=0;      //Timer Clock Source is from Prescaler
+    T0CS=0;     //Prescaler gets clock from FCPU (48MHz)
+
+    TMR0IE=0;   //Disable TIMER0 Interrupt
+
+    // set up UART
+    uart_init();
+    uart_puts("hello!\n");
+
+    loadSerialNumber();
+
+    TRISCbits.TRISC3 = 0; //enable  // FIXME: look into why he's doing this
+
+    // Set up buttons
+    ANSA4=0;
+    TRISA = 0b00111000;
+    WPUA = 0b00111000;     
+
+    // Set up LEDs 
+    //Configure Output
+    TRISCbits.TRISC2 = 0;
+    LATCbits.LATC2 = 0; // Switch on output to 12V
+    TRISCbits.TRISC3 = 0; //enable
+
+    // a little debug dance
+    for( int i=0; i<10; i++ ) { 
+        mLED_4_Toggle();
+        _delay_ms(200);
+    }
+    mLED_4_Off();
+
+    PEIE = 1;     //Enable Peripheral Interrupt (uart receive)
+
+    ei(); // enable global interrupts
+
+    USBDeviceInit(); //usb_device.c.  Initializes USB module SFRs and firmware vars to known states.
+    
+    //Watchdog Timer
+    WDTCON = 0x25; //256 seconds (max)
+
+} //end InitializeSystem
+
+
+
+//These are your actual interrupt handling routines.
+// PIC16F has only one interrupt vector,
+// so must check all possible interrupts when interrupt occurs
+void interrupt ISRCode()
+{
+    //Check which interrupt flag caused the interrupt.
+    //Service the interrupt
+    //Clear the interrupt flag
+    //Etc.
+#if defined(USB_INTERRUPT)
+    USBDeviceTasks();
+#endif
+
+    //TMR0 Overflow ISR
+    if(TMR0IE && TMR0IF) {  // timer0 overflow enabled and it overflowed
+        
+        timeToUpdateState = 1;
+
+        TMR0IF=0; //Clear Flag 
+    }
+    
+    // uart receive interrupt
+    if( RCIE && RCIF ) { //recieve a byte
+        lastRxByte = RCREG;
+        if(RCREG=='H') { //it said "Hi"
+            if(!TMR0IE){
+                TMR0IE=1;   //Enable TIMER0 Interrupt
+                //LATCbits.LATC3 = 1;
+                batteryCharged=0;
+                PWM2DCH=0xFF;
+            }
+            timeOutCounter=0;
+        }else if(RCREG=='B'){
+            batteryCharged=1;
+            PWM2DCH=0x44;
+            PORTCbits.RC2=0; //once we get the answer back we can bump the voltage back up to 12V out
+        }
+        else if(RCREG=='N'){
+            batteryCharged=0;
+            //PWM2DCH=0x44;       
+            PORTCbits.RC2=0; //12V out
+        }
+    }
+    
+}
+
+//
+// Update the base station LED and charge control
+// Called in main loop, triggered by Timer0 overflows
+// code from original CST-Base_Station-1454
+//
+void updateState(void)
+{
+    if( !timeToUpdateState ) return;
+
+    //Code for LED pulse
+    if(!batteryCharged){
+        if(LEDdirection){
+            PWM2DCH++;
+            if(PWM2DCH==0xFF){
+                LEDdirection=0;
+            }
+        }else{
+            PWM2DCH--;
+            if(PWM2DCH==0x00){
+                LEDdirection=1;
+            }
+        }
+    }
+    
+    if(batteryCounter==1000){ //time to check battery
+        PORTCbits.RC2=1; //5V out
+        uart_putc('T'); // check voltage
+    }else if(batteryCounter>=2000){
+        PORTCbits.RC2=0; //12V out
+        batteryCounter=0;
+    }
+    
+    if(timeOutCounter>=500) { //timed out
+        //LATCbits.LATC3 = 0; //turn off LED
+        PWM2DCH=0x00;
+        TMR0IE=0;
+        timeOutCounter=0;
+    }
+    
+    timeOutCounter++;//Increment Over Flow Counter
+    batteryCounter++;//Increment Over Flow Counter
+    timeToUpdateState = 0;
+}
+
+//
+// Deal with keypresses on base station.
+// Called in main loop to handle keypresses
+// code from original CST-Base_Station-1454
+//
+void handleKeys(void)
+{
+    static int i=0;
+    while(PORTAbits.RA5==0 && PORTAbits.RA3==1 && PORTAbits.RA4==1){//only plus pressed
+        i++;
+        unsigned char extraPresses;
+        if(i<=10){// 5 sec
+            uart_putc('u'); //up one
+            }else if(i>22){
+            uart_putc('P'); //up hour
+            _delay_ms(250);
+        }else if(i>10){
+            uart_putc('U'); //up ten
+            _delay_ms(125);
+        }
+        extraPresses = countStepsRA3();//returns extra button presses the user inputs before the watch has the chance to update
+        if (extraPresses==1){
+            uart_putc('u');
+        }else if(extraPresses==2){
+            uart_putc('a');
+        }else if(extraPresses>2){
+            uart_putc('b');
+        }
+    }
+    
+    while(PORTAbits.RA5==1 && PORTAbits.RA3==0 && PORTAbits.RA4==1){//only minus pressed
+        i++;
+        unsigned char extraPresses;
+        if(i<=10){// 5 sec
+            uart_putc('d'); //up one
+        }else if(i>22){
+            uart_putc('W'); //up ten
+            _delay_ms(250);
+        }else if(i>10){
+            uart_putc('D'); //up hour
+            _delay_ms(125);
+        }
+        extraPresses = countStepsRA4();//returns extra button presses the user inputs before the watch has the chance to update
+        if (extraPresses==1){
+            uart_putc('d');
+        }else if(extraPresses==2){
+            uart_putc('z');
+        }else if(extraPresses>2){
+            uart_putc('y');
+        }
+    }
+    
+    if(PORTAbits.RA4==0 && !modeButtonPressed){ //mode pressed, changes between 12 and 24 hour mode
+        modeButtonPressed=1;
+        uart_putc('M');
+        _delay_ms(10);   //debounce
+        
+    }else if(PORTAbits.RA4==1 && modeButtonPressed){
+        modeButtonPressed=0;
+        _delay_ms(10);   //debounce
+    }
+    
+    // easter egg to swap color
+    while(PORTAbits.RA5==0 && PORTAbits.RA3==0 && PORTAbits.RA4==0){
+        _delay_ms(1);
+        if(i>5000){// 5 sec
+            uart_putc('S'); //swap colors
+            i=0;
+        }
+        i++;
+    }
+    
+    //Diagnostic Mode
+    while(PORTAbits.RA5==0 && PORTAbits.RA3==0 && PORTAbits.RA4==1){
+        _delay_ms(1);
+        if(i>5000){// 5 sec
+            uart_putc('X'); //diagnostic mode
+            PORTCbits.RC2=1; //5V out
+            _delay_ms(1000); //delay, so an accurate battery reading can be made 12V charging brings battery up to 4.15 automatically)
+            _delay_ms(1000);
+            _delay_ms(1000);
+            PORTCbits.RC2=0; //12V out
+            i=0;
+        }
+        i++;
+    }
+}
+
+//
+// code from original CST-Base_Station-1454
+unsigned char countStepsRA3(void)
+{
+    int i;
+    int pressCount=0;
+    unsigned char buttonUp=0;
+    for(i=0; i<510; i++){
+        if(PORTAbits.RA5==1 && !buttonUp){ // released
+            buttonUp=1;
+            _delay_ms(10);   //debounce
+            i+=10;
+        }else if(PORTAbits.RA5==0 && buttonUp){ // pressed
+            buttonUp=0;
+            pressCount++;
+            _delay_ms(10);   //debounce
+            i+=10;
+        }
+        _delay_ms(1);
+    }
+    return pressCount;
+}
+
+//
+// code from original CST-Base_Station-1454
+unsigned char countStepsRA4(void)
+{
+    int i;
+    int pressCount=0;
+    unsigned char buttonUp=0;
+    for(i=0; i<510; i++){
+        if(PORTAbits.RA3==1 && !buttonUp){ // released
+            buttonUp=1;
+            _delay_ms(10);   //debounce
+            i+=10;
+        }else if(PORTAbits.RA3==0 && buttonUp){ // pressed
+            buttonUp=0;
+            pressCount++;
+            _delay_ms(10);   //debounce
+            i+=10;
+        }
+        _delay_ms(1);
+    }
+    return pressCount;
+}
 
 
 // ------------------- utility functions -----------------------------------
@@ -165,7 +524,6 @@ inline void loadSerialNumber(void)
 #endif
 
 
-
 // ------------- USB command handling ----------------------------------------
 
 // handleMessage(char* msgbuf) -- main command router
@@ -176,38 +534,14 @@ inline void loadSerialNumber(void)
 //  byte2..byte7 = args for command
 //
 // Available commands:
-//    - Set time                format: { 1, 'T', H,M,S, ...
-//    - Send byte to watch      format: { 1, 'S', b, ...
-//    - Receive byte from watch format: { 1, 'R', ...
-//    - 
-//    - Set Base LED            format: { 1, 'l', ...
-//    - Get Base Button State   format: { 1, 'b', ...
-//    - Get Base Version        format: { 1, 'v', 0,0,0
+//  - Set time                  format: { 1, 'T', H,M,S, ...
+//  - Send byte to watch        format: { 1, 'S', n, b, ...
+//  - Receive byte from watch   format: { 1, 'R', ...
+//  - 
+//  - Set Base LED              format: { 1, 'l', ...
+//  - Get Base Button State     format: { 1, 'b', ...
+//  - Get Base Version          format: { 1, 'v', 0,0,0
 //
-//
-// Available commands:
-//    - Fade to RGB color       format: { 1, 'c', r,g,b,     th,tl, n }
-//    - Set RGB color now       format: { 1, 'n', r,g,b,       0,0, n } (*)
-//    - Read current RGB color  format: { 1, 'r', n,0,0,       0,0, n } (2)
-//    - Serverdown tickle/off   format: { 1, 'D', on,th,tl,  st,sp,ep } (*)
-//    - PlayLoop                format: { 1, 'p', on,sp,ep,c,    0, 0 } (2)
-//    - Playstate readback      format: { 1, 'S', 0,0,0,       0,0, 0 } (2)
-//    - Set color pattern line  format: { 1, 'P', r,g,b,     th,tl, p }
-//    - Save color patterns     format: { 1, 'W', 0,0,0,       0,0, 0 } (2)
-//    - read color pattern line format: { 1, 'R', 0,0,0,       0,0, p }
-//    - Read EEPROM location    format: { 1, 'e', ad,0,0,      0,0, 0 } (1)
-//    - Write EEPROM location   format: { 1, 'E', ad,v,0,      0,0, 0 } (1)
-//    - Get version             format: { 1, 'v', 0,0,0,       0,0, 0 }
-//    - Test command            format: { 1, '!', 0,0,0,       0,0, 0 }
-//
-//  Fade to RGB color        format: { 1, 'c', r,g,b,      th,tl, ledn }
-//  Set RGB color now        format: { 1, 'n', r,g,b,        0,0, ledn }
-//  Play/Pause, with pos     format: { 1, 'p', {1/0},pos,0,  0,0,    0 }
-//  Play/Pause, with pos     format: { 1, 'p', {1/0},pos,endpos, 0,0,0 }
-//  Write color pattern line format: { 1, 'P', r,g,b,      th,tl,  pos }
-//  Read color pattern line  format: { 1, 'R', 0,0,0,        0,0, pos }
-//  Server mode tickle       format: { 1, 'D', {1/0},th,tl, {1,0},0, 0 }
-//  Get version              format: { 1, 'v', 0,0,0,        0,0, 0 }
 //
 void handleMessage(const char* msgbuf)
 {
@@ -216,77 +550,38 @@ void handleMessage(const char* msgbuf)
 
     uint8_t cmd;
 
-    //rid= msgbuf[0];
     cmd  = msgbuf[1];
-    //c.r  = msgbuf[2];
-    //c.g  = msgbuf[3];
-    //c.b  = msgbuf[4];
 
-    //  Fade to RGB color         format: { 1, 'c', r,g,b,      th,tl, ledn }
-    //   where time 't' is a number of 10msec ticks
     //
-    if(      cmd == 'c' ) {
-    }
-    //  Set RGB color now         format: { 1, 'n', r,g,b,        0,0, ledn }
+    //  Set Time                  format: { 1, 'T', H,M,S,      0,0,0 }
     //
-    else if( cmd == 'n' ) {
-        mLED_4_Off();
+    if(      cmd == 'T' ) {
+        uint8_t H = msgbuf[2];
+        uint8_t M = msgbuf[3];
+        uint8_t S = msgbuf[4];
     }
-    //  Read current color        format: { 1, 'r', 0,0,0,        0,0, 0 }
     //
-    else if( cmd == 'r' ) {
-    }
-    //  Play/Pause, with pos      format: { 1, 'p', {1/0},startpos,endpos,  0,0, 0 }
+    // Send byte to watch         format: { 1, 'S', n, b1,b2,b3,b4,b5 }
     //
-    else if( cmd == 'p' ) {
-    }
-    // Play state readback        format: { 1, 'S', 0,0,0, 0,0,0 }
-    // resonse format:  {
     else if( cmd == 'S' ) { 
-        hid_send_buf[2] = 1; 
-        hid_send_buf[3] = 3;
-        hid_send_buf[4] = 5;
-        hid_send_buf[5] = 7;
-        hid_send_buf[6] = 9;
-        hid_send_buf[7] = 0;
+        uint8_t cnt = msgbuf[2];
+        for( int i=0; i< cnt; i++ ) { 
+            uart_putc( msgbuf[3+i] );
+        }
     }
-    // Write color pattern line   format: { 1, 'P', r,g,b,      th,tl, pos }
-    //
-    else if( cmd == 'P' ) {
+    else if( cmd == 'R' ) { 
+        hid_send_buf[3] = lastRxByte;
     }
-    //  Read color pattern line   format: { 1, 'R', 0,0,0,        0,0, pos }
     //
-    else if( cmd == 'R' ) {
-        uint8_t pos = msgbuf[7];
-        hid_send_buf[2] = 30;
-        hid_send_buf[3] = 40;
-        hid_send_buf[4] = pos;
-        hid_send_buf[5] = 60;
-        hid_send_buf[6] = 70;
-    }
-    // Write color pattern to flash memory: { 1, 'W', 0x55,0xAA, 0xCA,0xFE, 0,0}
-    //
-    else if( cmd == 'W' ) {
-    }
-    // read eeprom byte           format: { 1, 'e', addr, 0,0, 0,0,0,0}
-    //
-    // ...
-    // not impelemented in mk2
-    // ...
-
-    //  Server mode tickle        format: { 1, 'D', {1/0},th,tl, {1,0}, sp, ep }
-    //
-    else if( cmd == 'D' ) {
-    }
     // Base Station button state  format: { 1, 'b' 0,0,0, 0,0,0 }
     // 
     else if( cmd == 'b' ) {
         hid_send_buf[3] =  PORTA;  // just return all of PORTA because why not?
     }
+    //
     //  Get version               format: { 1, 'v', 0,0,0,        0,0, 0 }
     //
     else if( cmd == 'v' ) {
-        mLED_4_On();
         hid_send_buf[3] = cstbase_ver_major;
         hid_send_buf[4] = cstbase_ver_minor;
     }
@@ -296,91 +591,6 @@ void handleMessage(const char* msgbuf)
 
     }
 }
-
-
-//These are your actual interrupt handling routines.
-// PIC16F has only one interrupt vector,
-// so must check all possible interrupts when interrupt occurs
-void interrupt ISRCode()
-{
-    //Check which interrupt flag caused the interrupt.
-    //Service the interrupt
-    //Clear the interrupt flag
-    //Etc.
-#if defined(USB_INTERRUPT)
-    USBDeviceTasks();
-#endif
-
-    // Timer2 Interrupt- Freq = 1045.75 Hz - Period = 0.000956 seconds
-    if( TMR2IF ) { // timer 2 interrupt flag
-        tick++;
-        TMR2IF = 0; // clears TMR2IF       bit 1 TMR2IF: TMR2 to PR2 Match Interrupt Flag bit
-    }
-}
-
-
-// ****************************************************************************
-// main
-//
-int main(void)
-{
-    InitializeSystem();
-
-    USBDeviceAttach();
-    
-    while (1) {
-        //updateLEDs();
-        //updateMisc();
-    }
-
-} //end main
-
-
-//
-static void InitializeSystem(void)
-{
-    // set IO pin state
-    ANSELA = 0x00;
-    ANSELC = 0x00;
-    TRISA = 0x00;
-    TRISC = 0x00;
-
-    TRISCbits.TRISC3 = 1; //disable  // FIXME: look into why he's doing this
-
-    // setup oscillator
-    OSCTUNE = 0;
-    OSCCON = 0xFC;          //16MHz HFINTOSC with 3x PLL enabled (48MHz operation)
-    ACTCON = 0x90;          //Enable active clock tuning with USB
-
-    // setup timer2 for tick functionality
-    T2CONbits.T2CKPS = 0b01;    // 1:4 prescaler
-    T2CONbits.T2OUTPS = 0b1011; //1:12 Postscaler
-    PR2 = 242;  // at delay(10), PR2=250 => 1.15msec (w/overhead), PR2=245 => 1.083, PR2=240 => 1.060
-    T2CONbits.TMR2ON = 1;       // bit 2 turn timer2 on;
-    PIE1bits.TMR2IE  = 1;       // enable Timer2 interrupts
-    INTCONbits.PEIE = 1;        // bit6 Peripheral Interrupt Enable bit...1 = Enables all unmasked peripheral interrupts
-
-    loadSerialNumber();
-
-    OPTION_REGbits.nWPUEN=0; // clear this bit to enable weak pull ups
-
-    TRISCbits.TRISC3 = 0; //enable  // FIXME: look into why he's doing this
-
-    mInitAllSwitches();
-    mInitAllLEDs();
-
-    for( int i=0; i<10; i++ ) { 
-        mLED_4_Toggle();
-        _delay_ms(200);
-    }
-    mLED_4_Off();
-
-    ei(); // enable global interrupts
-
-    USBDeviceInit(); //usb_device.c.  Initializes USB module SFRs and firmware vars to known states.
-} //end InitializeSystem
-
-
 
 // ******************************************************************************************************
 // ************** USB Callback Functions ****************************************************************
@@ -500,7 +710,7 @@ void USBCBErrorHandler(void)
     // if a USB error occurs.  For example, if the host sends an OUT
     // packet to your device, but the packet gets corrupted (ex:
     // because of a bad connection, or the user unplugs the
-    // USB cable during the transmission) this will typically set
+    // USB cable during the transmission) this will typically setv
     // one or more USB error interrupt flags.  Nothing specific
     // needs to be done however, since the SIE will automatically
     // send a "NAK" packet to the host.  In response to this, the

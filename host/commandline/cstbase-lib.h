@@ -59,8 +59,6 @@ int          cstbase_clearCacheDev( cstbase_device* dev );
 const char*  cstbase_getSerialForDev(cstbase_device* dev);
 int          cstbase_getCachedCount(void);
 
-int          cstbase_isMk2ById(int i);
-int          cstbase_isMk2(cstbase_device* dev);
 
 // scan USB for CST Base devices
 int          cstbase_enumerate();
@@ -87,7 +85,9 @@ int cstbase_read( cstbase_device* dev, void* buf, int len);
 
 int cstbase_getVersion(cstbase_device *dev);
 
-
+int cstbase_getButtons(cstbase_device *dev);
+int cstbase_sendBytesToWatch(cstbase_device *dev, uint8_t* bytebuf, uint8_t len );
+int cstbase_getByteFromWatch(cstbase_device *dev);
 
 
 int cstbase_testtest(cstbase_device *dev);

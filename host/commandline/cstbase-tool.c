@@ -112,10 +112,10 @@ static void usage(char *myName)
 "Usage: \n"
 "  %s <cmd> [options]\n"
 "where <cmd> is one of:\n"
-"  --play <1/0,pos>            Start playing color sequence (at pos)\n"
-"  --play <1/0,start,end,cnt>  Playing color sequence sub-loop (mk2)\n"
-"  --servertickle <1/0>[,1/0]  Turn on/off servertickle (w/on/off, uses -t msec)\n"
-"  --running                   Multi-LED effect (uses --led & --rgb)\n"
+"  --settime \n"
+"  --buttons                   Get base station button states\n"
+"  --send                      Send byte sequence to watch\n"
+"  --read                      Read last received byte from watch\n"
 "  --list                      List connected CST Base devices \n"
 " Nerd functions: (not used normally) \n"
 "  --version                   Display cstbase-tool version info \n"
@@ -137,6 +137,9 @@ enum {
     CMD_NONE = 0,
     CMD_LIST,
     CMD_VERSION,
+    CMD_BUTTONS,
+    CMD_SENDBYTES,
+    CMD_GETBYTE,
     CMD_TESTTEST,
 };
 
@@ -144,11 +147,9 @@ enum {
 int main(int argc, char** argv)
 {
     int openall = 0;
-    int nogamma = 0;
     int16_t arg=0;
 
     int  rc;
-    uint8_t tmpbuf[100];
     char serialnumstr[serialstrmax] = {'\0'}; 
 
     uint16_t seed = time(NULL);
@@ -157,10 +158,9 @@ int main(int argc, char** argv)
 
     static int cmd  = CMD_NONE;
 
-
     // parse options
     int option_index = 0, opt;
-    char* opt_str = "aqvhm:t:d:U:u:gl:";
+    char* opt_str = "aqvhm:t:d:U:u:l:";
     static struct option loptions[] = {
         {"all",        no_argument,       0,      'a'},
         {"verbose",    optional_argument, 0,      'v'},
@@ -171,6 +171,9 @@ int main(int argc, char** argv)
         {"help",       no_argument,       0,      'h'},
         {"list",       no_argument,       &cmd,   CMD_LIST },
         {"version",    no_argument,       &cmd,   CMD_VERSION },
+        {"buttons",    no_argument,       &cmd,   CMD_BUTTONS },
+        {"send",       required_argument, &cmd,   CMD_SENDBYTES },
+        {"get",        no_argument,       &cmd,   CMD_GETBYTE },
         {"testtest",   no_argument,       &cmd,   CMD_TESTTEST },
         {NULL,         0,                 0,      0}
     };
@@ -180,19 +183,11 @@ int main(int argc, char** argv)
         switch (opt) {
          case 0:             // deal with long opts that have no short opts
             switch(cmd) { 
-                /*
-
-            case CMD_MAGENTA:
-                rgbbuf[0] = 255; rgbbuf[2] = 255; 
+            case CMD_SENDBYTES:
+                hexread(cmdbuf, optarg, sizeof(cmdbuf));  // cmd w/ hexlist arg
                 break;
-            case CMD_YELLOW:
-                rgbbuf[0] = 255; rgbbuf[1] = 255; 
-                break;
-                */
             } // switch(cmd)
             break;
-        case 'g':
-            nogamma = 1;
         case 'a':
             openall = 1;
             break;
@@ -286,8 +281,7 @@ int main(int argc, char** argv)
     if( cmd == CMD_LIST ) { 
         printf("CST Base list: \n");
         for( int i=0; i< count; i++ ) {
-            printf("id:%d - serialnum:%s %s\n", i, cstbase_getCachedSerial(i), 
-                   (cstbase_isMk2ById(i)) ? "(mk2)":"");
+            printf("id:%d - serialnum:%s \n", i, cstbase_getCachedSerial(i) );
         }
 #ifdef USE_HIDDATA
         printf("(Listing not supported in HIDDATA builds)\n"); 
@@ -298,7 +292,16 @@ int main(int argc, char** argv)
         msg("cstbase-tool: firmware version: ");
         printf("%d\n",rc);
     }
-    else if( cmd == CMD_TESTTEST ) { 
+    else if( cmd == CMD_BUTTONS ) {
+        rc = cstbase_getButtons(dev);
+        msg("cstbase-tool: button state: ");
+        printf("%x\n",rc);
+        
+    } else if( cmd == CMD_SENDBYTES ) { 
+        msg("send bytes: %x\n", cmdbuf[0]);
+        rc = cstbase_sendBytesToWatch( dev, cmdbuf, 1 );
+        
+    } else if( cmd == CMD_TESTTEST ) { 
         msg("test test\n");
         rc = cstbase_testtest(dev);
     }
