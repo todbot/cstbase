@@ -3,8 +3,11 @@
  *
  * For Microchip PIC16F1454/5
  * - http://www.microchip.com/wwwproducts/Devices.aspx?dDocName=en556969
- * Uses Microchip's USB Framework (aka "MCHPFSUSB Library")
- * - http://www.microchip.com/stellent/idcplg?IdcService=SS_GET_PAGE&nodeId=2680&dDocName=en547784
+ *
+ * Uses Microchip's USB Framework (aka "MCHPFSUSB Library") 
+ * (recently renamed "MLA" - Microchip Library for Applications)
+ * http://www.microchip.com/pagehandler/en-us/devtools/mla/
+ * This firmware is built against the 2013-06-15 "Legacy MLA"
  *
  * Note: to compile, must have the Microchip Application Library frameworks
  * symlinked in the same directory level as the "cstbase-hid" directory.
@@ -52,10 +55,6 @@
 #include <stdint.h>
 
 
-//#define UART_BAUD_RATE 2400
-#include "uart_funcs.h"
-
-
 #if 1 // to fix stupid IDE error issues with __delay_ms
 #ifndef _delay_ms(x)
 #define _delay_ms(x) __delay_ms(x)
@@ -67,7 +66,6 @@
 
 //------------ chip configuration ------------------------------------
 
-//#warning Using Internal Oscillator
 #pragma config FOSC     = INTOSC
 #pragma config WDTE     = OFF
 #pragma config PWRTE    = ON
@@ -86,20 +84,20 @@
 #pragma config STVREN   = ON
 #pragma config BORV     = LO
 #pragma config LPBOR    = OFF
-#pragma config LVP      = OFF  // keep that on when using LVP programmer
+#pragma config LVP      = OFF  // keep that ON when using LVP programmer
 
 // -------------------------------------------------------------------
 
 
-#define cstbase_ver_major  '3'
-#define cstbase_ver_minor  '8'
+#define cstbase_ver_major  '1'
+#define cstbase_ver_minor  '1'
 
 #define cstbase_report_id 0x01
 
 
 // serial number of this cst base station
 // stored in a packed format at address 0x1FF8
-const uint8_t serialnum_packed[4] @ 0x1FF8 = {0x21, 0x43, 0xba, 0xdc };
+const uint8_t serialnum_packed[4] @ 0x1FF8 = {0x10, 0x42, 0xca, 0xfe };
 
 //** VARIABLES ******************************************************
 
@@ -115,10 +113,6 @@ RAMSNt my_RAMSN;
 #define OUT_DATA_BUFFER_ADDRESS (IN_DATA_BUFFER_ADDRESS + HID_INT_IN_EP_SIZE)
 #define FEATURE_DATA_BUFFER_ADDRESS (OUT_DATA_BUFFER_ADDRESS + HID_INT_OUT_EP_SIZE)
 #define FEATURE_DATA_BUFFER_ADDRESS_TAG @FEATURE_DATA_BUFFER_ADDRESS
-//
-#else
-#define RX_DATA_BUFFER_ADDRESS
-#define TX_DATA_BUFFER_ADDRESS
 #endif
 
 uint8_t hid_send_buf[USB_EP0_BUFF_SIZE] FEATURE_DATA_BUFFER_ADDRESS_TAG;
@@ -134,10 +128,16 @@ bit modeButtonPressed = 0;
 bit LEDdirection = 0; //1=up, 0=down
 int timeOutCounter=0;
 int batteryCounter;
-bit batteryCharged=0;
+volatile bit batteryCharged=0;
 //unsigned char udata;
-bit timeToUpdateState=0;
-uint8_t lastRxByte=0;
+// new things
+volatile bit timeToUpdateState=0;
+volatile uint8_t lastRxByte=0;
+
+
+//#define UART_BAUD_RATE 2400
+#include "uart_funcs.h"
+
 
 //
 static void InitializeSystem(void);
@@ -150,16 +150,6 @@ void updateState(void);
 void handleKeys(void);
 unsigned char countStepsRA3(void);
 unsigned char countStepsRA4(void);
-
-
-// ----------------------- millis time keeping -----------------------------
-
-// millis time created by Timer2 handling in interrupt
-
-volatile uint32_t tick;  // for "millis()" function, a count of 1.024msec units
-
-// hack because this compiler has no optimizations
-#define millis() (tick)
 
 
 // ****************************************************************************
@@ -252,18 +242,11 @@ static void InitializeSystem(void)
     LATCbits.LATC2 = 0; // Switch on output to 12V
     TRISCbits.TRISC3 = 0; //enable
 
-    // a little debug dance
-    for( int i=0; i<10; i++ ) { 
-        mLED_4_Toggle();
-        _delay_ms(200);
-    }
-    mLED_4_Off();
-
     PEIE = 1;     //Enable Peripheral Interrupt (uart receive)
 
     ei(); // enable global interrupts
 
-    USBDeviceInit(); //usb_device.c.  Initializes USB module SFRs and firmware vars to known states.
+    USBDeviceInit(); //usb_device.c.  Initializes USB module SFRs & firmware vars to known states.
     
     //Watchdog Timer
     WDTCON = 0x25; //256 seconds (max)
@@ -271,10 +254,12 @@ static void InitializeSystem(void)
 } //end InitializeSystem
 
 
-
-//These are your actual interrupt handling routines.
+//
+// Interrupt handling routines
 // PIC16F has only one interrupt vector,
-// so must check all possible interrupts when interrupt occurs
+// so must check all possible interrupt sources when interrupt occurs
+// must get in and out of ISR quickly so we don't starve other interrupts
+//
 void interrupt ISRCode()
 {
     //Check which interrupt flag caused the interrupt.
@@ -287,14 +272,14 @@ void interrupt ISRCode()
 
     //TMR0 Overflow ISR
     if(TMR0IE && TMR0IF) {  // timer0 overflow enabled and it overflowed
-        
-        timeToUpdateState = 1;
+
+        timeToUpdateState = 1;  // just signal so we can handle it outside the ISR
 
         TMR0IF=0; //Clear Flag 
     }
     
     // uart receive interrupt
-    if( RCIE && RCIF ) { //recieve a byte
+    if( RCIE && RCIF ) {    // receive interrupt enabled and p recieve a byte
         lastRxByte = RCREG;
         if(RCREG=='H') { //it said "Hi"
             if(!TMR0IE){
@@ -307,7 +292,7 @@ void interrupt ISRCode()
         }else if(RCREG=='B'){
             batteryCharged=1;
             PWM2DCH=0x44;
-            PORTCbits.RC2=0; //once we get the answer back we can bump the voltage back up to 12V out
+            PORTCbits.RC2=0; //once we get the answer back we can bump voltage back up to 12V out
         }
         else if(RCREG=='N'){
             batteryCharged=0;
@@ -375,7 +360,7 @@ void handleKeys(void)
         unsigned char extraPresses;
         if(i<=10){// 5 sec
             uart_putc('u'); //up one
-            }else if(i>22){
+        }else if(i>22){
             uart_putc('P'); //up hour
             _delay_ms(250);
         }else if(i>10){
@@ -497,6 +482,80 @@ unsigned char countStepsRA4(void)
 }
 
 
+
+// ------------- USB command handling ----------------------------------------
+
+// handleMessage(char* msgbuf) -- main command router
+//
+// msgbuf[] is 8 bytes long
+//  byte0 = report-id
+//  byte1 = command
+//  byte2..byte7 = args for command
+//
+// Available commands:
+//  - Set time                  format: { 1, 'T', H,M,S, ...
+//  - Send byte to watch        format: { 1, 'S', n, b, ...
+//  - Receive byte from watch   format: { 1, 'R', ...
+//  - 
+//  - Set Base LED              format: { 1, 'l', ...
+//  - Get Base Button State     format: { 1, 'b', ...
+//  - Get Base Version          format: { 1, 'v', 0,0,0
+//
+//
+void handleMessage(const char* msgbuf)
+{
+    // pre-load response with request, contains report id
+    memcpy( hid_send_buf, msgbuf, 8 );
+
+    uint8_t cmd = msgbuf[1];
+
+    //
+    //  Set Time                  format: { 1, 'T', H,M,S,      0,0,0 }
+    //
+    if(      cmd == 'T' ) {
+        uint8_t H = msgbuf[2];
+        uint8_t M = msgbuf[3];
+        //uint8_t S = msgbuf[4];
+        
+        char buf[10];
+        sprintf(buf, "F%2.2d:%2.2d", H,M);
+     
+        uart_puts( buf );  // send command to watch
+        
+    }
+    //
+    // Send bytes to watch        format: { 1, 'S', n, b1,b2,b3,b4,b5,b6 }
+    //
+    else if( cmd == 'S' ) { 
+        uint8_t cnt = msgbuf[2];
+        for( int i=0; i< cnt; i++ ) { 
+            uart_putc( msgbuf[3+i] );
+        }
+    }
+    //
+    // Get last byte from watch   format: { 1, 'R', 0,0,0, 0,0,0 }
+    //
+    else if( cmd == 'R' ) { 
+        hid_send_buf[3] = lastRxByte;
+    }
+    //
+    // Base Station button state  format: { 1, 'b' 0,0,0, 0,0,0 }
+    // 
+    else if( cmd == 'b' ) {
+        hid_send_buf[3] =  PORTA;  // just return all of PORTA because why not?
+    }
+    //
+    //  Get version               format: { 1, 'v', 0,0,0,        0,0, 0 }
+    //
+    else if( cmd == 'v' ) {
+        hid_send_buf[3] = cstbase_ver_major;
+        hid_send_buf[4] = cstbase_ver_minor;
+    }
+    else {
+
+    }
+}
+
 // ------------------- utility functions -----------------------------------
 //
 static char tohex(uint8_t num)
@@ -523,74 +582,6 @@ inline void loadSerialNumber(void)
 #define loadSerialNumber()
 #endif
 
-
-// ------------- USB command handling ----------------------------------------
-
-// handleMessage(char* msgbuf) -- main command router
-//
-// msgbuf[] is 8 bytes long
-//  byte0 = report-id
-//  byte1 = command
-//  byte2..byte7 = args for command
-//
-// Available commands:
-//  - Set time                  format: { 1, 'T', H,M,S, ...
-//  - Send byte to watch        format: { 1, 'S', n, b, ...
-//  - Receive byte from watch   format: { 1, 'R', ...
-//  - 
-//  - Set Base LED              format: { 1, 'l', ...
-//  - Get Base Button State     format: { 1, 'b', ...
-//  - Get Base Version          format: { 1, 'v', 0,0,0
-//
-//
-void handleMessage(const char* msgbuf)
-{
-    // pre-load response with request, contains report id
-    memcpy( hid_send_buf, msgbuf, 8 );
-
-    uint8_t cmd;
-
-    cmd  = msgbuf[1];
-
-    //
-    //  Set Time                  format: { 1, 'T', H,M,S,      0,0,0 }
-    //
-    if(      cmd == 'T' ) {
-        uint8_t H = msgbuf[2];
-        uint8_t M = msgbuf[3];
-        uint8_t S = msgbuf[4];
-    }
-    //
-    // Send byte to watch         format: { 1, 'S', n, b1,b2,b3,b4,b5 }
-    //
-    else if( cmd == 'S' ) { 
-        uint8_t cnt = msgbuf[2];
-        for( int i=0; i< cnt; i++ ) { 
-            uart_putc( msgbuf[3+i] );
-        }
-    }
-    else if( cmd == 'R' ) { 
-        hid_send_buf[3] = lastRxByte;
-    }
-    //
-    // Base Station button state  format: { 1, 'b' 0,0,0, 0,0,0 }
-    // 
-    else if( cmd == 'b' ) {
-        hid_send_buf[3] =  PORTA;  // just return all of PORTA because why not?
-    }
-    //
-    //  Get version               format: { 1, 'v', 0,0,0,        0,0, 0 }
-    //
-    else if( cmd == 'v' ) {
-        hid_send_buf[3] = cstbase_ver_major;
-        hid_send_buf[4] = cstbase_ver_minor;
-    }
-    else if( cmd == '!' ) { // testing testing
-    }
-    else {
-
-    }
-}
 
 // ******************************************************************************************************
 // ************** USB Callback Functions ****************************************************************

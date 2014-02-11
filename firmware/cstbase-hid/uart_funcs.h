@@ -41,17 +41,21 @@ void uart_putc(unsigned char data)
 {
     while(!TRMT);  // wait for empty
     TXREG = data;
-    //timeOutCounter=0; //because it takes time on the watch side to process, and it can time out
+    timeOutCounter=0; //because it takes time on the watch side to process, and it can time out
 }
 
 // put a null-terminated string
 void uart_puts(const char *data)
 {
+    /*
     do
     {
         while(!TRMT);
         TXREG = *data;
     } while( *data++ );
+    */
+    while (*data) 
+        uart_putc(*data++);
 }
 
 #endif

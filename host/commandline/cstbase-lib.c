@@ -10,7 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>  // for toupper()
-#include <unistd.h>
+#include <unistd.h> 
+#include <time.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -41,10 +42,6 @@ static int cstbase_cached_count = 0;  // number of cached entities
 #define LOG(...) do {} while (0)
 #endif
 
-
-void cstbase_sortCache(void);
-
-
 //----------------------------------------------------------------------------
 // implementation-varying code 
 
@@ -57,84 +54,25 @@ void cstbase_sortCache(void);
 #endif
 
 
-
 // -------------------------------------------------------------------------
 // everything below here doesn't need to know about USB details
 // except for a "cstbase_device*"
 // -------------------------------------------------------------------------
 
-//
-int cstbase_getCachedCount(void)
+// set time to current localtime
+int cstbase_setTime(cstbase_device *dev)
 {
-    return cstbase_cached_count;
+    uint8_t hours,mins,secs;
+    cstbase_getLocalTime( &hours, &mins, &secs );
+    return cstbase_setTimeTo( dev, hours, mins, secs );
 }
 
-//
-const char* cstbase_getCachedPath(int i)
+// set time to given hours & mins (0-23, 0-59)
+int cstbase_setTimeTo(cstbase_device *dev, uint8_t hours, uint8_t mins, uint8_t secs)
 {
-    return cstbase_infos[i].path;
-}
-//
-const char* cstbase_getCachedSerial(int i)
-{
-    return cstbase_infos[i].serial;
-}
-
-int cstbase_getCacheIndexByPath( const char* path ) 
-{
-    for( int i=0; i< cache_max; i++ ) { 
-        if( strcmp( cstbase_infos[i].path, (const char*) path ) == 0 ) return i;
-    }
-    return -1;
-}
-
-int cstbase_getCacheIndexBySerial( const char* serial ) 
-{
-    for( int i=0; i< cache_max; i++ ) { 
-        if( strcmp( cstbase_infos[i].serial, serial ) == 0 ) return i;
-    }
-    return -1;
-}
-
-int cstbase_getCacheIndexByDev( cstbase_device* dev ) 
-{
-    for( int i=0; i< cache_max; i++ ) { 
-        if( cstbase_infos[i].dev == dev ) return i;
-    }
-    return -1;
-}
-
-const char* cstbase_getSerialForDev(cstbase_device* dev)
-{
-    int i = cstbase_getCacheIndexByDev( dev );
-    if( i>=0 ) return cstbase_infos[i].serial;
-    return NULL;
-}
-
-int cstbase_clearCacheDev( cstbase_device* dev ) 
-{
-    int i = cstbase_getCacheIndexByDev( dev );
-    if( i>=0 ) cstbase_infos[i].dev = NULL; // FIXME: hmmmm
-    return i;
-}
-
-
-
-//
-int cstbase_getVersion(cstbase_device *dev)
-{
-    char buf[cstbase_buf_size] = {cstbase_report_id, 'v' };
+    char buf[cstbase_buf_size] = {cstbase_report_id, 'T', hours, mins, secs };
     int len = sizeof(buf);
-
-    //hid_set_nonblocking(dev, 0);
     int rc = cstbase_write(dev, buf, sizeof(buf));
-    cstbase_sleep( 50 ); //FIXME:
-    if( rc != -1 ) // no error
-        rc = cstbase_read(dev, buf, len);
-    if( rc != -1 ) // also no error
-        rc = ((buf[3]-'0') * 100) + (buf[4]-'0'); 
-    // rc is now version number or error  
-    // FIXME: we don't know vals of errcodes
     return rc;
 }
 
@@ -187,29 +125,102 @@ int cstbase_getByteFromWatch(cstbase_device *dev)
     if( rc != -1 ) // no error
         rc = cstbase_read(dev, buf, len);
     // rc is now last received byte, or error -1
+    if( rc != -1 ) 
+        rc = buf[3];
     return rc;
 }
 
+//
+int cstbase_getVersion(cstbase_device *dev)
+{
+    char buf[cstbase_buf_size] = {cstbase_report_id, 'v' };
+    int len = sizeof(buf);
+
+    //hid_set_nonblocking(dev, 0);
+    int rc = cstbase_write(dev, buf, sizeof(buf));
+    cstbase_sleep( 50 ); //FIXME:
+    if( rc != -1 ) // no error
+        rc = cstbase_read(dev, buf, len);
+    if( rc != -1 ) // also no error
+        rc = ((buf[3]-'0') * 100) + (buf[4]-'0'); 
+    // rc is now version number or error  
+    // FIXME: we don't know vals of errcodes
+    return rc;
+}
+
+//-----------------------------------------------------------------------------
+
+//  return current H:M:S time as byte triplet (avoid inflicting time.h on caller)
+void cstbase_getLocalTime(uint8_t* hours, uint8_t* mins, uint8_t* secs)
+//const struct tm* cstbase_getCurrentTime(void)
+{
+    // get current time as seconds since epoch
+    time_t current_time = time(NULL);
+    struct tm* tminfo = localtime(&current_time);
+    *hours = tminfo->tm_hour;
+    *mins  = tminfo->tm_min;
+    *secs  = tminfo->tm_sec;
+}
 
 
 //
-int cstbase_testtest( cstbase_device *dev)
+int cstbase_getCachedCount(void)
 {
-    uint8_t buf[cstbase_buf_size] = { cstbase_report_id, '!', 0,0,0, 0,0,0 };
+    return cstbase_cached_count;
+}
 
-    int rc = cstbase_write(dev, buf, sizeof(buf) );
-    cstbase_sleep( 50 ); //FIXME:
-    if( rc != -1 ) { // no error
-        rc = cstbase_read(dev, buf, sizeof(buf));
-        for( int i=0; i<sizeof(buf); i++ ) { 
-            printf("%2.2x,",(uint8_t)buf[i]);
-        }
-        printf("\n");
+//
+const char* cstbase_getCachedPath(int i)
+{
+    return cstbase_infos[i].path;
+}
+//
+const char* cstbase_getCachedSerial(int i)
+{
+    return cstbase_infos[i].serial;
+}
+
+//
+int cstbase_getCacheIndexByPath( const char* path ) 
+{
+    for( int i=0; i< cache_max; i++ ) { 
+        if( strcmp( cstbase_infos[i].path, (const char*) path ) == 0 ) return i;
     }
-    else { 
-        printf("testtest error: rc=%d\n", rc);
+    return -1;
+}
+
+//
+int cstbase_getCacheIndexBySerial( const char* serial ) 
+{
+    for( int i=0; i< cache_max; i++ ) { 
+        if( strcmp( cstbase_infos[i].serial, serial ) == 0 ) return i;
     }
-    return rc;
+    return -1;
+}
+
+//
+int cstbase_getCacheIndexByDev( cstbase_device* dev ) 
+{
+    for( int i=0; i< cache_max; i++ ) { 
+        if( cstbase_infos[i].dev == dev ) return i;
+    }
+    return -1;
+}
+
+//
+const char* cstbase_getSerialForDev(cstbase_device* dev)
+{
+    int i = cstbase_getCacheIndexByDev( dev );
+    if( i>=0 ) return cstbase_infos[i].serial;
+    return NULL;
+}
+
+//
+int cstbase_clearCacheDev( cstbase_device* dev ) 
+{
+    int i = cstbase_getCacheIndexByDev( dev );
+    if( i>=0 ) cstbase_infos[i].dev = NULL; // FIXME: hmmmm
+    return i;
 }
 
 
@@ -225,6 +236,7 @@ int cmp_cstbase_info_serial(const void *a, const void *b)
                     bib->serial, 
                     serialstrmax);
 } 
+
 
 void cstbase_sortCache(void)
 {

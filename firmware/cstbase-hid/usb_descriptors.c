@@ -173,7 +173,7 @@ ROM USB_DEVICE_DESCRIPTOR device_dsc=
     0x00,                   // Protocol code
     USB_EP0_BUFF_SIZE,          // Max packet size for EP0, see usb_config.h
     0x27B8,                 // Vendor ID: ThingM
-    0x4242,                 // Product ID: CST Base
+    0xC570,                 // Product ID: CST Base
     0x0002,                 // Device release number in BCD format
     0x01,                   // Manufacturer string index
     0x02,                   // Product string index

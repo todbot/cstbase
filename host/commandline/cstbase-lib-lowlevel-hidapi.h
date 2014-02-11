@@ -23,10 +23,7 @@ int cstbase_enumerateByVidPid(int vid, int pid)
                 strcpy( cstbase_infos[p].path,   cur_dev->path );
                 sprintf( cstbase_infos[p].serial, "%ls", cur_dev->serial_number);
                 uint32_t serialnum = strtol( cstbase_infos[p].serial, NULL, 16);
-                cstbase_infos[p].type = CSTBASE_MK1;
-                if( serialnum >= cstbasemk2_serialstart ) {
-                    cstbase_infos[p].type = CSTBASE_MK2;
-                }
+                cstbase_infos[p].type = 1;  // just one version currently
                 p++;
             }
         }
