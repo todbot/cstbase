@@ -1,4 +1,3 @@
-
 CST Base station firmware
 =========================
 
@@ -17,8 +16,11 @@ This firmware is built & tested with the following:
 Note: to compile, must have the Microchip Application Library frameworks
 symlinked in the same directory level as the "cstbase-hid" directory.
 e.g. if you installed the framework in ~/microchip_solutions_v2013-06-15/Microchip
-then do: "ln -s ~/microchip_solutions_v2013-06-15/Microchip Microchip"
+then in this directory do. 
 
+    ln -s ~/microchip_solutions_v2013-06-15/Microchip Microchip
+
+The symlink "Microchip" is already placed in the repo as an example.
 
 The orignal non-USB firmware is in "CST-Base_Station_1454.X".
 It is for comparison purposes only.
