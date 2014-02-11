@@ -21,8 +21,8 @@
       </logicalFolder>
       <itemPath>usb_config.h</itemPath>
       <itemPath>HardwareProfile.h</itemPath>
-      <itemPath>uart.h</itemPath>
       <itemPath>HardwareProfile-PIC16F1455-1454.h</itemPath>
+      <itemPath>uart_funcs.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LibraryFiles"
                    displayName="Library Files"
@@ -93,7 +93,7 @@
         <property key="extra-include-directories"
                   value=".;../../../Microchip/Include;../Microchip/Include;../Microchip/USB"/>
         <property key="identifier-length" value="100"/>
-        <property key="operation-mode" value="pro"/>
+        <property key="operation-mode" value="free"/>
         <property key="opt-xc8-compiler-strict_ansi" value="false"/>
         <property key="optimization-assembler" value="true"/>
         <property key="optimization-assembler-files" value="true"/>
@@ -157,7 +157,6 @@
         <property key="ToolFirmwareFilePath"
                   value="Press to browse for a specific firmware version"/>
         <property key="ToolFirmwareOption.UseLatestFirmware" value="true"/>
-        <property key="firmware.download.all" value="false"/>
         <property key="hwtoolclock.frcindebug" value="false"/>
         <property key="memories.aux" value="false"/>
         <property key="memories.bootflash" value="false"/>
