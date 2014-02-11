@@ -1,7 +1,7 @@
 Command-line Tool and C library for cstbase
 ===========================================
 
-To build, see the Makefile.
+To build, and to see prerequisites to building, see the Makefile.
 
 The current support build products are:
 

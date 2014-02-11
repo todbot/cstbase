@@ -1,3 +1,4 @@
+#
 # Makefile for "cstbase-lib" and "cstbase-tool"
 # should work on Mac OS X, Windows, Linux, and other Linux-like systems
 #  
@@ -14,7 +15,7 @@
 # Platform-specific notes:
 #
 # Mac OS X 
-#   - Install Xcode with "Unix Dev Support" and "Command-line tools" (in Preferences)
+#   - Install Xcode with "Unix Dev Support" and "Command-line tools" (in Xcode Preferences)
 #   - make
 #
 # Windows XP/7  
@@ -80,7 +81,9 @@ ifeq "$(PKGOS)" ""
    PKGOS = $(OS)
 endif
 
-# pick low-level implemenation style
+# pick low-level implemenation style when invoking make, like:
+#   % USBLIB_TYPE=HIDDATA make
+# 
 # "HIDAPI" type is best for Mac, Windows, Linux Desktop, 
 #  but has dependencies on iconv, libusb-1.0, pthread, dl
 #
@@ -88,8 +91,7 @@ endif
 #  and the only dependencies it has is libusb-0.1
 #
 
-USBLIB_TYPE = HIDAPI
-#USBLIB_TYPE = HIDDATA
+USBLIB_TYPE ?= HIDAPI
 
 # uncomment for debugging HID stuff
 #CFLAGS += -DDEBUG_PRINTF
