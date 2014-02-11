@@ -2,12 +2,25 @@
 # Makefile for "cstbase-lib" and "cstbase-tool"
 # should work on Mac OS X, Windows, Linux, and other Linux-like systems
 #  
+# Architecture is usually detected automatically, so normally just type "make".
+# Otherwise, you can use the "OS" build argument
+#
 # Build arguments:
-# - "OS=macosx"  -- build Mac version on Mac OS X
-# - "OS=windows" -- build Windows version on Windows
-# - "OS=linux"   -- build Linux version on Linux
+# - "OS=macosx"           -- build Mac version on Mac OS X
+# - "OS=windows"          -- build Windows version on Windows
+# - "OS=linux"            -- build Linux version on Linux
+# - "OS=..."              -- others, see below
+#
+# - "USBLIB_TYPE=HIDAPI"  -- use HIDAPI library
+# - "USBLIB_TYPE=HIDDATA" -- use HIDDATA libusb wrapper
 # 
-# Architecture is usually detected automatically, so normally just type "make"
+# USBLIB_TYPE picks low-level implemenation style for doing USB HID transfers.
+# Makefile will default to what it thinks is best.
+#  -- "HIDAPI" type is best for Mac, Windows, Linux Desktop, 
+#      but has dependencies on iconv, libusb-1.0, pthread, dl
+#  -- "HIDDATA" type is best for low-resource Linux, 
+#      and the only dependencies it has is libusb-0.1
+#
 #
 # Dependencies: 
 # - hidapi (included), which uses libusb on Linux-like OSes
@@ -15,7 +28,7 @@
 # Platform-specific notes:
 #
 # Mac OS X 
-#   - Install Xcode with "Unix Dev Support" and "Command-line tools" (in Xcode Preferences)
+#   - Install Xcode w/ "Unix Dev Support" & "Command-line tools" (see Prefs)
 #   - make
 #
 # Windows XP/7  
@@ -81,15 +94,6 @@ ifeq "$(PKGOS)" ""
    PKGOS = $(OS)
 endif
 
-# pick low-level implemenation style when invoking make, like:
-#   % USBLIB_TYPE=HIDDATA make
-# 
-# "HIDAPI" type is best for Mac, Windows, Linux Desktop, 
-#  but has dependencies on iconv, libusb-1.0, pthread, dl
-#
-# "HIDDATA" type is best for low-resource Linux, 
-#  and the only dependencies it has is libusb-0.1
-#
 
 USBLIB_TYPE ?= HIDAPI
 
@@ -105,8 +109,6 @@ CFLAGS += -mmacosx-version-min=10.6
 ifeq "$(USBLIB_TYPE)" "HIDAPI"
 CFLAGS += -DUSE_HIDAPI
 CFLAGS += -arch i386 -arch x86_64
-# don't need pthread with clang
-#CFLAGS += -pthread
 CFLAGS += -I./hidapi/hidapi 
 OBJS = ./hidapi/mac/hid.o
 endif
@@ -126,14 +128,14 @@ EXEFLAGS =
 LIBFLAGS = -dynamiclib -o $(LIBTARGET) -Wl,-search_paths_first $(LIBS)
 EXE=
 
+STATIC_LIB_CMD = libtool -o cstbase-lib.a $(OBJS)
+
 endif
 
 #################  Windows  ##################################################
 ifeq "$(OS)" "windows"
 LIBTARGET = cstbase-lib.dll
-#LIBS +=  -mwindows -lsetupapi -Wl,--enable-auto-import -static-libgcc -static-libstdc++ -lkernel32 
-#LIBS +=  -mwindows -lsetupapi -Wl,-Bdynamic -lgdi32 -Wl,--enable-auto-import -static-libgcc -static-libstdc++ -lkernel32
-LIBS +=             -lsetupapi -Wl,--enable-auto-import -static-libgcc -static-libstdc++ 
+LIBS +=  -lsetupapi -Wl,--enable-auto-import -static-libgcc -static-libstdc++ 
 
 ifeq "$(USBLIB_TYPE)" "HIDAPI"
 CFLAGS += -DUSE_HIDAPI
@@ -147,9 +149,10 @@ OBJS = ./hiddata.o
 endif
 
 EXEFLAGS =
-#LIBFLAGS = -shared -o $(LIBTARGET) -Wl,--add-stdcall-alias -Wl,--export-all-symbols -Wl,--out-implib,$(LIBTARGET).a $(LIBS)
 LIBFLAGS = -shared -o $(LIBTARGET) -Wl,--add-stdcall-alias -Wl,--export-all-symbols
 EXE= .exe
+
+STATIC_LIB_CMD = ar rcs -o cstbase-lib.a $(OBJS)
 
 endif
 
@@ -175,6 +178,8 @@ endif
 EXEFLAGS = -static
 LIBFLAGS = -shared -o $(LIBTARGET) $(LIBS)
 EXE=
+
+STATIC_LIB_CMD = ar rcs cstbase-lib.a $(OBJS)
 
 endif
 
@@ -299,7 +304,7 @@ cstbase-tool: $(OBJS) cstbase-tool.o
 
 lib: $(OBJS)
 	$(CC) $(LIBFLAGS) $(CFLAGS) $(OBJS) $(LIBS)
-
+	$(STATIC_LIB_CMD)
 
 package: 
 	@echo "Zipping up cstbase-tool for '$(PKGOS)'"
@@ -310,6 +315,7 @@ clean:
 	rm -f $(OBJS)
 	rm -f $(LIBTARGET)
 	rm -f cstbase-tool.o hiddata.o
+	rm -f cstbase-lib.a
 
 distclean: clean
 	rm -f cstbase-tool$(EXE)

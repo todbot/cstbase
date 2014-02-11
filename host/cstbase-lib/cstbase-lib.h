@@ -34,14 +34,15 @@ struct cstbase_device_;
 
 void cstbase_sortCache(void);
 
-#if USE_HIDAPI
+#if !defined(USE_HIDAPI) && !defined(USE_HIDDATA)
+#warning "USE_HIDAPI or USE_HIDDATA not defined, choosing USE_HIDAPI"
+#define USE_HIDAPI
+#endif
 
-typedef struct hid_device_ cstbase_device;  // <-- opaque cstbase data structure 
-
-#elif USE_HIDDATA
-
-typedef struct usbDevice   cstbase_device;  // <-- opaque cstbase data structure 
-
+#if defined(USE_HIDAPI)
+typedef struct hid_device_ cstbase_device; // <-- opaque cstbase data structure
+#elif defined(USE_HIDDATA)
+typedef struct usbDevice   cstbase_device; // <-- opaque cstbase data structure
 #endif
 
 
