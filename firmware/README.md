@@ -6,10 +6,9 @@ For Microchip PIC16F1454 or PIC16F1455:
 
 Uses Microchip's USB Framework, aka "MCHPFSUSB Library",
 recently renamed "MLA" - Microchip Library for Applications
-  http://www.microchip.com/pagehandler/en-us/devtools/mla/
 
 This firmware is built & tested with the following:
-- USB Stack - 2013-06-15 "Legacy MLA"
+- USB Stack - 2013-06-15 "Legacy MLA" -   http://www.microchip.com/pagehandler/en-us/devtools/mla/
 - XC8 compiler v1.12 in "Free" mode
 - MPLAB X v2.00
 
