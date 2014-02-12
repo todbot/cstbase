@@ -2,7 +2,7 @@
 #define _UART_FUNCS_H
 
 #ifndef UART_BAUD_RATE
-#define UART_BAUD_RATE 2400
+#define UART_BAUD_RATE 2048
 #endif
 
 

@@ -105,7 +105,8 @@ const uint8_t serialnum_packed[4] @ 0x1FF8 = {0x10, 0x42, 0xca, 0xfe };
 RAMSNt my_RAMSN;
 #endif
 
-#if defined(_16F1459) || defined(_16F1455) || defined(_16F1454)
+#if defined(_16F1459) || defined(_16F1455) || defined(_16F1454) || \
+    defined(_16LF1459) || defined(_16LF1455) || defined(_16LF1454)
 #define RX_DATA_BUFFER_ADDRESS @0x2050
 #define TX_DATA_BUFFER_ADDRESS @0x20A0
 // FIXME: the below is ugly & redundant
@@ -225,14 +226,18 @@ static void InitializeSystem(void)
 
     // set up UART
     uart_init();
+#if 0
     uart_puts("hello!\n");
+#endif
 
     loadSerialNumber();
 
     TRISCbits.TRISC3 = 0; //enable  // FIXME: look into why he's doing this
 
     // Set up buttons
-    ANSA4=0;
+#if defined(_16F1459) || defined(_16F1455) || defined(_16LF1459) || defined(_16LF1455)
+    ANSA4=0;  // this reg doesn't exist on 16F1454 (see datasheet TABLE 3-12)
+#endif
     TRISA = 0b00111000;
     WPUA = 0b00111000;     
 
