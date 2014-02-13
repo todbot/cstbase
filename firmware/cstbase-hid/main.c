@@ -238,6 +238,7 @@ static void InitializeSystem(void)
 #if defined(_16F1459) || defined(_16F1455) || defined(_16LF1459) || defined(_16LF1455)
     ANSA4=0;  // this reg doesn't exist on 16F1454 (see datasheet TABLE 3-12)
 #endif
+    ANSELA = 0x00;  // Disable analog inputs  (see http://www.microchip.com/forums/m767575.aspx)
     TRISA = 0b00111000;
     WPUA = 0b00111000;     
 
